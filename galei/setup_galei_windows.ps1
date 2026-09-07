@@ -29,8 +29,19 @@ $lm = ''
 $extra = @()
 if ($vramGB -ge 12) { $profile='quality'; $lm='acestep-5Hz-lm-1.7B' }
 elseif ($vramGB -ge 8) { $profile='balanced'; $lm='acestep-5Hz-lm-0.6B' }
-elseif ($vramGB -ge 6) { $profile='light'; $lm='acestep-5Hz-lm-0.6B'; $extra += 'ACESTEP_USE_CPU_OFFLOAD=true' }
-elseif ($vramGB -gt 0) { $profile='low-vram'; $lm=''; $extra += 'ACESTEP_USE_CPU_OFFLOAD=true'; $extra += 'ACESTEP_DIT_INFERENCE_DEVICE=cpu' }
+elseif ($vramGB -ge 6) {
+  $profile='light'
+  $lm='acestep-5Hz-lm-0.6B'
+  $extra += 'ACESTEP_OFFLOAD_TO_CPU=true'
+}
+elseif ($vramGB -gt 0) {
+  $profile='low-vram'
+  $lm=''
+  $extra += 'ACESTEP_OFFLOAD_TO_CPU=true'
+  $extra += 'ACESTEP_OFFLOAD_DIT_TO_CPU=true'
+  $extra += 'ACESTEP_DTYPE=float32'
+  $extra += 'ACESTEP_INIT_LLM=false'
+}
 
 Write-Host "Selected profile: $profile" -ForegroundColor Green
 if ($freeGB -lt 20) { Write-Warning 'Less than 20 GB free disk. Model downloads may fail.' }
