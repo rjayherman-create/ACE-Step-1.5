@@ -10,7 +10,7 @@ from loguru import logger
 
 from acestep import gpu_config
 
-_ROCM_DTYPE_MAP = {
+_DTYPE_MAP = {
     "float32": torch.float32,
     "float16": torch.float16,
     "bfloat16": torch.bfloat16,
@@ -22,24 +22,21 @@ def _cuda_supports_bfloat16() -> bool:
     return gpu_config.cuda_supports_bfloat16()
 
 
-def _resolve_rocm_dtype() -> torch.dtype:
-    """Return a safe model dtype for ROCm/HIP devices.
-
-    Uses ``float32`` by default to avoid segfaults from incomplete
-    ``bfloat16`` kernel support on some ROCm GPU configurations (e.g.
-    AMD iGPUs on Strix Halo).  Set the ``ACESTEP_ROCM_DTYPE`` environment
-    variable to ``float16`` or ``bfloat16`` to override for hardware that
-    fully supports those formats.
-    """
-    raw = os.environ.get("ACESTEP_ROCM_DTYPE", "float32").strip().lower()
-    dtype = _ROCM_DTYPE_MAP.get(raw)
+def _resolve_requested_dtype(env_name: str, default: str) -> torch.dtype:
+    """Resolve an explicit dtype override from an environment variable."""
+    raw = os.environ.get(env_name, default).strip().lower()
+    dtype = _DTYPE_MAP.get(raw)
     if dtype is None:
         logger.warning(
-            f"[initialize_service] Unknown ACESTEP_ROCM_DTYPE={raw!r}; "
-            "falling back to float32."
+            f"[initialize_service] Unknown {env_name}={raw!r}; falling back to {default}."
         )
-        dtype = torch.float32
+        dtype = _DTYPE_MAP[default]
     return dtype
+
+
+def _resolve_rocm_dtype() -> torch.dtype:
+    """Return a safe model dtype for ROCm/HIP devices."""
+    return _resolve_requested_dtype("ACESTEP_ROCM_DTYPE", "float32")
 
 
 class InitServiceOrchestratorMixin:
@@ -89,7 +86,14 @@ class InitServiceOrchestratorMixin:
                     "(set ACESTEP_ROCM_DTYPE=bfloat16 or float16 to override)"
                 )
             elif resolved_device == "cuda":
-                if gpu_config.cuda_supports_bfloat16():
+                explicit_dtype = os.environ.get("ACESTEP_DTYPE", "").strip().lower()
+                if explicit_dtype:
+                    self.dtype = _resolve_requested_dtype("ACESTEP_DTYPE", "float32")
+                    logger.info(
+                        f"[initialize_service] CUDA dtype forced by ACESTEP_DTYPE={explicit_dtype}: "
+                        f"using {self.dtype}."
+                    )
+                elif gpu_config.cuda_supports_bfloat16():
                     self.dtype = torch.bfloat16
                 else:
                     self.dtype = torch.float16
@@ -128,7 +132,6 @@ class InitServiceOrchestratorMixin:
                 checkpoint_dir = str(get_checkpoints_dir())
             checkpoint_path = Path(checkpoint_dir)
 
-            # Resolve VAE selection: explicit param > env var > default.
             resolved_vae_variant = (
                 vae_checkpoint
                 or os.environ.get("ACESTEP_VAE_CHECKPOINT")
