@@ -14,23 +14,29 @@ REM Exact safe settings for the detected GTX 1650 / 4 GB Tier 1 machine.
 set "ACESTEP_INIT_LLM=false"
 set "ACESTEP_NO_INIT=false"
 set "ACESTEP_CONFIG_PATH=acestep-v15-turbo"
+set "ACESTEP_DTYPE=float32"
+set "ACESTEP_OFFLOAD_TO_CPU=true"
+set "ACESTEP_OFFLOAD_DIT_TO_CPU=true"
 set "MAX_CUDA_VRAM=4"
 set "CHECK_UPDATE=false"
 
-REM Repair any stale .env value that may contain whitespace from an older setup.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='.env'; if(Test-Path $p){$lines=Get-Content $p; $found=$false; $out=@(); foreach($line in $lines){if($line -match '^ACESTEP_CONFIG_PATH='){ $out += 'ACESTEP_CONFIG_PATH=acestep-v15-turbo'; $found=$true } else { $out += $line }}; if(-not $found){$out += 'ACESTEP_CONFIG_PATH=acestep-v15-turbo'}; $out | Set-Content -Encoding UTF8 $p} else {'ACESTEP_CONFIG_PATH=acestep-v15-turbo' | Set-Content -Encoding UTF8 $p}"
+REM Repair the local .env so Tier 1 settings persist across launches.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='.env'; $wanted=@{'ACESTEP_CONFIG_PATH'='acestep-v15-turbo';'ACESTEP_DTYPE'='float32';'ACESTEP_OFFLOAD_TO_CPU'='true';'ACESTEP_OFFLOAD_DIT_TO_CPU'='true';'ACESTEP_INIT_LLM'='false'}; $lines=@(); if(Test-Path $p){$lines=Get-Content $p}; foreach($k in $wanted.Keys){$lines=$lines | Where-Object {$_ -notmatch ('^'+[regex]::Escape($k)+'=')}}; foreach($k in $wanted.Keys){$lines += ($k+'='+$wanted[$k])}; $lines | Set-Content -Encoding UTF8 $p"
 
 echo ==========================================================
-echo Galei Ivrit Jr - GTX 1650 4 GB Safe Profile
+echo Galei Ivrit Jr - GTX 1650 4 GB Stability Profile
 echo ==========================================================
 echo LM: OFF
 echo Model: ACE-Step 1.5 Turbo
+echo Dtype: FLOAT32
+echo CPU offload: ON
+echo DiT offload: ON
 echo Batch: 1
 echo VRAM tier: 4 GB / Tier 1
 echo.
 
 echo Starting ACE-Step music engine and loading the model...
-start "ACE-Step API" cmd /k "cd /d %~dp0 && set ^"ACESTEP_INIT_LLM=false^" && set ^"ACESTEP_NO_INIT=false^" && set ^"ACESTEP_CONFIG_PATH=acestep-v15-turbo^" && set ^"MAX_CUDA_VRAM=4^" && set ^"CHECK_UPDATE=false^" && call start_api_server.bat"
+start "ACE-Step API" cmd /k "cd /d %~dp0 && set ^"ACESTEP_INIT_LLM=false^" && set ^"ACESTEP_NO_INIT=false^" && set ^"ACESTEP_CONFIG_PATH=acestep-v15-turbo^" && set ^"ACESTEP_DTYPE=float32^" && set ^"ACESTEP_OFFLOAD_TO_CPU=true^" && set ^"ACESTEP_OFFLOAD_DIT_TO_CPU=true^" && set ^"MAX_CUDA_VRAM=4^" && set ^"CHECK_UPDATE=false^" && call start_api_server.bat"
 
 echo Waiting for ACE-Step model/API to become ready...
 set READY=0
@@ -40,7 +46,7 @@ for /L %%I in (1,1,180) do (
     set READY=1
     goto :ApiReady
   )
-  if %%I EQU 1 echo First model load can take several minutes on a 4 GB GPU.
+  if %%I EQU 1 echo First model load can take several minutes on this 4 GB profile.
   timeout /t 2 /nobreak >nul
 )
 
@@ -50,7 +56,6 @@ if "%READY%"=="0" (
   echo ==========================================================
   echo ACE-STEP MODEL/API DID NOT BECOME READY
   echo ==========================================================
-  echo.
   echo Leave the ACE-Step API window open and send its final lines.
   echo.
   pause
