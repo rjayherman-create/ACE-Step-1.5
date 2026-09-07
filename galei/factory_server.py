@@ -21,11 +21,16 @@ def load_profile():
 def safe_generation_settings(requested_variations:int):
     p=load_profile(); vram=float(p.get('vramGB') or 0); gpu=str(p.get('gpu') or '')
     legacy=any(x in gpu.lower() for x in ['quadro','gtx 10','p1000','p2000','p3000','p4000','p5000','p6000'])
-    # First priority is a successful full-audio render on older hardware.
-    # DiT-only still generates complete mixed music with vocals; it simply avoids the extra LM planner.
     if vram <= 8 or legacy or not vram:
         return p, {'thinking':False,'batch_size':1,'use_cot_caption':False,'use_cot_language':False,'bpm':112,'key_scale':'C Major','time_signature':'4','inference_steps':8}, 'SAFE LOCAL'
     return p, {'thinking':True,'batch_size':min(max(1,requested_variations),2),'use_cot_caption':True,'use_cot_language':True,'inference_steps':8}, 'QUALITY LOCAL'
+
+def ace_ready():
+    try:
+        req(ACE+'/openapi.json',timeout=3)
+        return True
+    except Exception:
+        return False
 
 def send_audio(remote):
     if remote.startswith('http'): url=remote
@@ -42,8 +47,8 @@ class H(SimpleHTTPRequestHandler):
         p=urllib.parse.urlparse(self.path)
         if p.path=='/api/status':
             profile=load_profile()
-            try:self.j({'factory':True,'ace':req(ACE+'/health',timeout=3),'profile':profile})
-            except Exception as e:self.j({'factory':True,'ace':False,'profile':profile,'error':str(e)})
+            ready=ace_ready()
+            self.j({'factory':True,'ace':ready,'profile':profile,'ace_url':ACE})
             return
         if p.path=='/api/result':
             q=urllib.parse.parse_qs(p.query); tid=(q.get('task_id')or[''])[0]
