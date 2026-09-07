@@ -10,18 +10,34 @@ if not exist .venv (
 
 if not exist galei\logs mkdir galei\logs
 
-echo Starting ACE-Step music engine...
-start "ACE-Step API" cmd /k "cd /d %~dp0 && call start_api_server.bat"
+REM Exact safe settings for the detected GTX 1650 / 4 GB Tier 1 machine.
+set ACESTEP_INIT_LLM=false
+set ACESTEP_NO_INIT=false
+set ACESTEP_CONFIG_PATH=acestep-v15-turbo
+set MAX_CUDA_VRAM=4
+set CHECK_UPDATE=false
 
-echo Waiting for ACE-Step API to become ready...
+echo ==========================================================
+echo Galei Ivrit Jr - GTX 1650 4 GB Safe Profile
+echo ==========================================================
+echo LM: OFF
+echo Model: ACE-Step 1.5 Turbo
+echo Batch: 1
+echo VRAM tier: 4 GB / Tier 1
+echo.
+
+echo Starting ACE-Step music engine and loading the model...
+start "ACE-Step API" cmd /k "cd /d %~dp0 && set ACESTEP_INIT_LLM=false && set ACESTEP_NO_INIT=false && set ACESTEP_CONFIG_PATH=acestep-v15-turbo && set MAX_CUDA_VRAM=4 && set CHECK_UPDATE=false && call start_api_server.bat"
+
+echo Waiting for ACE-Step model/API to become ready...
 set READY=0
-for /L %%I in (1,1,120) do (
-  powershell -NoProfile -Command "try { $r=Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 http://127.0.0.1:8001/health; if($r.StatusCode -eq 200){exit 0}else{exit 1} } catch { exit 1 }" >nul 2>nul
+for /L %%I in (1,1,180) do (
+  powershell -NoProfile -Command "try { $r=Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 http://127.0.0.1:8001/health; if($r.StatusCode -eq 200){exit 0}else{exit 1} } catch { exit 1 }" >nul 2>nul
   if !ERRORLEVEL! EQU 0 (
     set READY=1
     goto :ApiReady
   )
-  if %%I EQU 1 echo ACE-Step can take several minutes on first launch while models initialize.
+  if %%I EQU 1 echo First model load can take several minutes on a 4 GB GPU.
   timeout /t 2 /nobreak >nul
 )
 
@@ -29,20 +45,16 @@ for /L %%I in (1,1,120) do (
 if "%READY%"=="0" (
   echo.
   echo ==========================================================
-  echo ACE-STEP DID NOT START
+  echo ACE-STEP MODEL/API DID NOT BECOME READY
   echo ==========================================================
   echo.
-  echo The ACE-Step API window should contain the actual error.
-  echo Please leave that window open and send a screenshot of it.
-  echo.
-  echo You can also test the API manually by opening:
-  echo http://127.0.0.1:8001/health
+  echo Leave the ACE-Step API window open and send its final lines.
   echo.
   pause
   exit /b 1
 )
 
-echo ACE-Step API is ready.
+echo ACE-Step model/API is ready.
 echo Starting Galei Song Factory...
 start "Galei Song Factory" cmd /k "cd /d %~dp0 && uv run --no-sync python galei\factory_server.py"
 
