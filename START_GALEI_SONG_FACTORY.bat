@@ -35,7 +35,7 @@ start "ACE-Step API" cmd /k "cd /d %~dp0 && set ^"ACESTEP_INIT_LLM=false^" && se
 echo Waiting for ACE-Step model/API to become ready...
 set READY=0
 for /L %%I in (1,1,180) do (
-  powershell -NoProfile -Command "try { $r=Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 http://127.0.0.1:8001/health; if($r.StatusCode -eq 200){exit 0}else{exit 1} } catch { exit 1 }" >nul 2>nul
+  powershell -NoProfile -Command "try { $r=Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 http://127.0.0.1:8001/openapi.json; if($r.StatusCode -eq 200){exit 0}else{exit 1} } catch { exit 1 }" >nul 2>nul
   if !ERRORLEVEL! EQU 0 (
     set READY=1
     goto :ApiReady
@@ -61,11 +61,23 @@ echo ACE-Step model/API is ready.
 echo Starting Galei Song Factory...
 start "Galei Song Factory" cmd /k "cd /d %~dp0 && uv run --no-sync python galei\factory_server.py"
 
-for /L %%I in (1,1,30) do (
+set FACTORYREADY=0
+for /L %%I in (1,1,60) do (
   powershell -NoProfile -Command "try { $r=Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 http://127.0.0.1:8765/api/status; if($r.StatusCode -eq 200){exit 0}else{exit 1} } catch { exit 1 }" >nul 2>nul
-  if !ERRORLEVEL! EQU 0 goto :FactoryReady
+  if !ERRORLEVEL! EQU 0 (
+    set FACTORYREADY=1
+    goto :FactoryReady
+  )
   timeout /t 1 /nobreak >nul
 )
 
 :FactoryReady
+if "%FACTORYREADY%"=="0" (
+  echo Galei UI server did not start. Check the Galei Song Factory window.
+  pause
+  exit /b 1
+)
+
+echo Opening Galei Ivrit Jr Song Factory...
 start "" http://127.0.0.1:8765
+exit /b 0
