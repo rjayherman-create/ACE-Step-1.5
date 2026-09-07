@@ -11,11 +11,14 @@ if not exist .venv (
 if not exist galei\logs mkdir galei\logs
 
 REM Exact safe settings for the detected GTX 1650 / 4 GB Tier 1 machine.
-set ACESTEP_INIT_LLM=false
-set ACESTEP_NO_INIT=false
-set ACESTEP_CONFIG_PATH=acestep-v15-turbo
-set MAX_CUDA_VRAM=4
-set CHECK_UPDATE=false
+set "ACESTEP_INIT_LLM=false"
+set "ACESTEP_NO_INIT=false"
+set "ACESTEP_CONFIG_PATH=acestep-v15-turbo"
+set "MAX_CUDA_VRAM=4"
+set "CHECK_UPDATE=false"
+
+REM Repair any stale .env value that may contain whitespace from an older setup.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$p='.env'; if(Test-Path $p){$lines=Get-Content $p; $found=$false; $out=@(); foreach($line in $lines){if($line -match '^ACESTEP_CONFIG_PATH='){ $out += 'ACESTEP_CONFIG_PATH=acestep-v15-turbo'; $found=$true } else { $out += $line }}; if(-not $found){$out += 'ACESTEP_CONFIG_PATH=acestep-v15-turbo'}; $out | Set-Content -Encoding UTF8 $p} else {'ACESTEP_CONFIG_PATH=acestep-v15-turbo' | Set-Content -Encoding UTF8 $p}"
 
 echo ==========================================================
 echo Galei Ivrit Jr - GTX 1650 4 GB Safe Profile
@@ -27,7 +30,7 @@ echo VRAM tier: 4 GB / Tier 1
 echo.
 
 echo Starting ACE-Step music engine and loading the model...
-start "ACE-Step API" cmd /k "cd /d %~dp0 && set ACESTEP_INIT_LLM=false && set ACESTEP_NO_INIT=false && set ACESTEP_CONFIG_PATH=acestep-v15-turbo && set MAX_CUDA_VRAM=4 && set CHECK_UPDATE=false && call start_api_server.bat"
+start "ACE-Step API" cmd /k "cd /d %~dp0 && set ^"ACESTEP_INIT_LLM=false^" && set ^"ACESTEP_NO_INIT=false^" && set ^"ACESTEP_CONFIG_PATH=acestep-v15-turbo^" && set ^"MAX_CUDA_VRAM=4^" && set ^"CHECK_UPDATE=false^" && call start_api_server.bat"
 
 echo Waiting for ACE-Step model/API to become ready...
 set READY=0
