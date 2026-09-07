@@ -20,9 +20,9 @@ def load_profile():
 
 def safe_generation_settings(requested_variations:int):
     p=load_profile(); vram=float(p.get('vramGB') or 0); gpu=str(p.get('gpu') or '')
-    legacy=any(x in gpu.lower() for x in ['quadro','gtx 10','p1000','p2000','p3000','p4000','p5000','p6000'])
+    legacy=any(x in gpu.lower() for x in ['quadro','gtx 10','gtx 16','p1000','p2000','p3000','p4000','p5000','p6000'])
     if vram <= 8 or legacy or not vram:
-        return p, {'thinking':False,'batch_size':1,'use_cot_caption':False,'use_cot_language':False,'bpm':112,'key_scale':'C Major','time_signature':'4','inference_steps':8}, 'SAFE LOCAL'
+        return p, {'thinking':False,'batch_size':1,'use_cot_caption':False,'use_cot_language':False,'bpm':112,'key_scale':'C Major','time_signature':'4','inference_steps':4}, 'GTX1650 QUICK TEST'
     return p, {'thinking':True,'batch_size':min(max(1,requested_variations),2),'use_cot_caption':True,'use_cot_language':True,'inference_steps':8}, 'QUALITY LOCAL'
 
 def ace_ready():
@@ -46,10 +46,7 @@ class H(SimpleHTTPRequestHandler):
     def do_GET(self):
         p=urllib.parse.urlparse(self.path)
         if p.path=='/api/status':
-            profile=load_profile()
-            ready=ace_ready()
-            self.j({'factory':True,'ace':ready,'profile':profile,'ace_url':ACE})
-            return
+            profile=load_profile(); ready=ace_ready(); self.j({'factory':True,'ace':ready,'profile':profile,'ace_url':ACE}); return
         if p.path=='/api/result':
             q=urllib.parse.parse_qs(p.query); tid=(q.get('task_id')or[''])[0]
             try:self.j(req(ACE+'/query_result','POST',{'task_id_list':[tid]},20))
@@ -66,10 +63,14 @@ class H(SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path=='/api/generate':
             d=self.body(); profile,extra,mode=safe_generation_settings(int(d.get('variations',1)))
-            payload={'prompt':d['style'],'lyrics':d['lyrics'],'vocal_language':'he','audio_format':'mp3','model':'acestep-v15-turbo','use_format':False,'audio_duration':int(d.get('duration',75)),**extra}
+            requested_duration=int(d.get('duration',30)); vram=float(profile.get('vramGB') or 0)
+            duration=min(requested_duration,45) if vram and vram<=8 else requested_duration
+            payload={'prompt':d['style'],'lyrics':d['lyrics'],'vocal_language':'he','audio_format':'mp3','model':'acestep-v15-turbo','use_format':False,'audio_duration':duration,**extra}
             try:
                 result=req(ACE+'/release_task','POST',payload,30)
-                if isinstance(result,dict):result['galei_mode']=mode;result['galei_profile']=profile;result['galei_settings']={'thinking':payload['thinking'],'batch_size':payload['batch_size'],'model':payload['model']}
+                if isinstance(result,dict):
+                    result['galei_mode']=mode; result['galei_profile']=profile
+                    result['galei_settings']={'thinking':payload['thinking'],'batch_size':payload['batch_size'],'model':payload['model'],'duration':duration,'inference_steps':payload['inference_steps']}
                 self.j(result)
             except Exception as e:self.j({'error':str(e),'galei_mode':mode,'galei_profile':profile},502)
             return
